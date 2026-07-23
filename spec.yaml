@@ -1,0 +1,123 @@
+schemaVersion: "2"
+kind: sandbox
+name: pi-leo-sbx
+displayName: Pi Leo SBX
+description: "Pi coding agent with OmniRoute, Git SSH signing, and SSH push to GitHub"
+
+sandbox:
+  image: docker/sandbox-templates:shell-docker
+  entrypoint: [pi]
+
+agentInstructions:
+  filename: AGENTS.md
+  content: |
+    ## OmniRoute
+
+    The OmniRoute extension is pre-installed and configured to connect to
+    `http://host.docker.internal:20128`. OmniRoute provides multi-provider
+    LLM routing, web search, and web fetch.
+
+    ## Git commit signing
+
+    This sandbox is configured to sign git commits with your host's SSH key.
+    Commits and tags are signed automatically. Use `git log --show-signature`
+    to verify signatures on existing commits.
+
+    ## GitHub SSH authentication
+
+    GitHub's host keys are pre-populated in `~/.ssh/known_hosts`, so SSH
+    operations to GitHub (clone, push, pull) work without interactive host
+    verification prompts. Make sure your SSH key is loaded on the host
+    (`ssh-add ~/.ssh/id_ed25519`) and registered with your GitHub account.
+
+credentials:
+  - service: omniroute
+    description: "OmniRoute API key"
+    apiKey:
+      name: OMNIROUTE_API_KEY
+      inject:
+        - domain: host.docker.internal:20128
+          scheme: bearer
+
+permissions:
+  network:
+    allow:
+      - registry.npmjs.org
+      - host.docker.internal:20128
+      - github.com:22
+      - github.com:443
+      - api.github.com:443
+
+
+
+setup:
+  install:
+    - command: |
+        npm config set proxy "$HTTP_PROXY" &&
+        npm config set https-proxy "$HTTP_PROXY" &&
+        i=0; while [ $i -lt 5 ]; do
+          npm install -g --maxsockets=1 --fetch-timeout=600000 @earendil-works/pi-coding-agent && break
+          i=$((i+1))
+          echo "Retrying ($i/5)..."
+        done
+      user: "1000"
+      description: "Configure npm proxy and install pi coding agent globally (with retries)"
+    - command: |
+        mkdir -p /home/agent/.pi/agent
+        cat > /home/agent/.pi/agent/omniroute-config.json << 'CONFIGEOF'
+        {
+          "baseUrl": "http://host.docker.internal:20128",
+          "apiKey": "proxy-managed"
+        }
+        CONFIGEOF
+        pi install git:github.com/Leoo0x1/omniroute-pi-ext
+      user: "1000"
+      description: "Configure OmniRoute and install the omniroute pi extension"
+    - command: |
+        git config --system gpg.format ssh
+        git config --system --unset-all user.signingKey || true
+        git config --system commit.gpgSign true
+        git config --system tag.gpgSign true
+        git config --system gpg.ssh.defaultKeyCommand /home/agent/.config/git/ssh-signing-key-command
+        git config --system gpg.ssh.allowedSignersFile /home/agent/.config/git/allowed_signers
+        if [ "$(git config --system --get core.hooksPath || true)" = "/home/agent/.config/git/hooks" ]; then
+            git config --system --unset-all core.hooksPath
+        fi
+      user: "0"
+      description: "Configure SSH commit signing with a dynamic key command"
+    - command: |
+        mkdir -p /home/agent/.ssh
+        chmod 700 /home/agent/.ssh
+        chown agent:agent /home/agent/.ssh
+        curl -s https://api.github.com/meta \
+          | jq -r '.ssh_keys[] | "github.com " + .' \
+          >> /home/agent/.ssh/known_hosts
+        chmod 644 /home/agent/.ssh/known_hosts
+        chown agent:agent /home/agent/.ssh/known_hosts
+      user: "0"
+      description: "Fetch and install GitHub host keys from api.github.com/meta"
+  files:
+    - path: /home/agent/.config/git/ssh-signing-key-command
+      mode: "0755"
+      content: |
+        #!/bin/sh
+        set -e
+
+        if [ -z "$SSH_AUTH_SOCK" ]; then
+            echo "[git-ssh-sign] no SSH agent - cannot sign commits" >&2
+            exit 1
+        fi
+
+        key=$(ssh-add -L 2>/dev/null | head -n 1)
+        if [ -z "$key" ]; then
+            echo "[git-ssh-sign] no keys in SSH agent - cannot sign commits" >&2
+            exit 1
+        fi
+
+        config_dir="/home/agent/.config/git"
+        mkdir -p "$config_dir"
+
+        email=$(git config user.email 2>/dev/null || printf '%s' "agent@sandbox.local")
+        printf '%s %s\n' "$email" "$key" > "$config_dir/allowed_signers"
+        printf 'key::%s\n' "$key"
+      description: "Resolve the forwarded SSH agent key for Git SSH signing"
