@@ -46,7 +46,8 @@ credentials:
       name: OMNIROUTE_API_KEY
       inject:
         - domain: localhost:20128
-          scheme: bearer
+          header: Authorization
+          format: "Bearer %s"
 
 caps:
   network:
