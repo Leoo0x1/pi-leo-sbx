@@ -44,6 +44,7 @@ credentials:
     description: "OmniRoute API key"
     apiKey:
       name: OMNIROUTE_API_KEY
+      proxyManaged: true
       inject:
         - domain: localhost:20128
           header: Authorization
