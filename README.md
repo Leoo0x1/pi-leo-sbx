@@ -10,7 +10,7 @@ A custom sandbox kit (`kind: sandbox`) that bundles:
 ## Usage
 
 ```console
-$ sbx run --kit "git+https://github.com/Leoo0x1/pi-leo-sbx.git" pi
+$ sbx run --kit "git+https://github.com/Leoo0x1/pi-leo-sbx.git" pi-leo-sbx
 ```
 
 The first launch installs everything. Subsequent launches reuse the sandbox.
