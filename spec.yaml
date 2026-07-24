@@ -45,14 +45,14 @@ credentials:
     apiKey:
       name: OMNIROUTE_API_KEY
       inject:
-        - domain: host.docker.internal:20128
+        - domain: localhost:20128
           scheme: bearer
 
 caps:
   network:
     allow:
     - registry.npmjs.org
-    - host.docker.internal:20128
+    - localhost:20128
     - github.com:22
     - github.com:443
     - api.github.com:443
