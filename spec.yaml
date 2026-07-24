@@ -1,4 +1,13 @@
-schemaVersion: "2"
+# NOTE: keep schemaVersion "1" until the released sbx CLI supports v2.
+# The spec library in this repo already supports v2, but the Docker
+# Sandboxes sbx binary ships with an older version. Once updated
+# upstream, switch to:
+#   schemaVersion: "2"
+#   entrypoint: [pi]
+#   agentInstructions: {filename: AGENTS.md, content: "..."}  (top-level)
+#   permissions: {network: {allow: [...]}}  (instead of network:)
+#   setup: {install: [...], files: [...]}  (instead of commands:)
+schemaVersion: "1"
 kind: sandbox
 name: pi-leo-sbx
 displayName: Pi Leo SBX
@@ -6,11 +15,11 @@ description: "Pi coding agent with OmniRoute, Git SSH signing, and SSH push to G
 
 sandbox:
   image: docker/sandbox-templates:shell-docker
-  entrypoint: [pi]
+  entrypoint:
+    run: [pi]
+  aiFilename: AGENTS.md
 
-agentInstructions:
-  filename: AGENTS.md
-  content: |
+agentContext: |
     ## OmniRoute
 
     The OmniRoute extension is pre-installed and configured to connect to
@@ -39,18 +48,18 @@ credentials:
         - domain: host.docker.internal:20128
           scheme: bearer
 
-permissions:
+caps:
   network:
     allow:
-      - registry.npmjs.org
-      - host.docker.internal:20128
-      - github.com:22
-      - github.com:443
-      - api.github.com:443
+    - registry.npmjs.org
+    - host.docker.internal:20128
+    - github.com:22
+    - github.com:443
+    - api.github.com:443
 
 
 
-setup:
+commands:
   install:
     - command: |
         npm config set proxy "$HTTP_PROXY" &&
@@ -96,7 +105,7 @@ setup:
         chown agent:agent /home/agent/.ssh/known_hosts
       user: "0"
       description: "Fetch and install GitHub host keys from api.github.com/meta"
-  files:
+  initFiles:
     - path: /home/agent/.config/git/ssh-signing-key-command
       mode: "0755"
       content: |
