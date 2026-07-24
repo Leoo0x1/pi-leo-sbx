@@ -26,8 +26,9 @@ with your real key at request time. Your key **never enters the container**.
 On your host, run:
 
 ```console
-$ sbx secret set <sandbox-name> omniroute <your-omni-api-key>
+$ sbx secret set <sandbox-name> omniroute
 ```
+When prompted input <your-omni-api-key>
 
 ### Option B: via credentials file
 
